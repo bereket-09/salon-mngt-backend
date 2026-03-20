@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { createCustomer, listCustomers, checkIn, checkOut, listCustomerSessions } from '../controllers/customersController.js';
+import { authRequired } from '../middleware/auth.js';
+const router = Router();
+router.post('/', authRequired, createCustomer);
+router.get('/', authRequired, listCustomers);
+router.get('/sessions/:id', authRequired, listCustomerSessions);
+router.post('/:id/check-in', authRequired, checkIn);
+router.post('/:customerId/check-out', authRequired, checkOut);
+export default router;
