@@ -13,13 +13,15 @@ import bookingRoutes from './routes/bookings.js';
 import reportRoutes from './routes/reports.js';
 import sessionRoutes from './routes/sessions.js';
 import galleryRoutes from './routes/gallery.js';
+import paymentMethodsRoutes from './routes/paymentMethods.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 app.use((req, res, next) => {
-  if (!/^\/gallery\/\d+\/image$/.test(req.path)) {
+  const isBinary = /^\/gallery\/\d+\/image$/.test(req.path) || /^\/payment-methods\/\d+\/logo$/.test(req.path);
+  if (!isBinary) {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
@@ -50,6 +52,7 @@ app.use('/bookings', bookingRoutes);
 app.use('/reports', reportRoutes);
 app.use('/sessions', sessionRoutes);
 app.use('/gallery', galleryRoutes);
+app.use('/payment-methods', paymentMethodsRoutes);
 
 if (process.env.RUN_SYNC === '1') {
   (async () => {

@@ -92,7 +92,19 @@ export const Invoice = sequelize.define('Invoice', {
   totalAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
   paidAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
   status: { type: DataTypes.STRING, defaultValue: 'pending' },
+  paymentMethodSnapshot: { type: DataTypes.STRING, allowNull: true },
 }, { tableName: 'invoices' });
+
+export const PaymentMethod = sequelize.define('PaymentMethod', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  type: { type: DataTypes.STRING, allowNull: false, defaultValue: 'bank' },
+  accountInfo: { type: DataTypes.STRING, allowNull: true },
+  logo: { type: DataTypes.BLOB, allowNull: true },
+  mimeType: { type: DataTypes.STRING, allowNull: true },
+  order: { type: DataTypes.INTEGER, defaultValue: 0 },
+  status: { type: DataTypes.STRING, defaultValue: 'active' },
+}, { tableName: 'payment_methods' });
 
 export const InvoiceItem = sequelize.define('InvoiceItem', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
@@ -197,6 +209,9 @@ Service.belongsToMany(Assignment, { through: AssignmentService });
 Customer.hasMany(Invoice, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
 Invoice.belongsTo(Customer);
 
+PaymentMethod.hasMany(Invoice, { foreignKey: { allowNull: true }, onDelete: 'SET NULL' });
+Invoice.belongsTo(PaymentMethod);
+
 Invoice.hasMany(InvoiceItem, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
 InvoiceItem.belongsTo(Invoice);
 
@@ -238,5 +253,6 @@ Booking.belongsTo(User, { as: 'Specialist', foreignKey: 'EmployeeId' });
 
 export default {
   sequelize, Branch, User, Customer, Service, Assignment, AssignmentService,
-  Invoice, InvoiceItem, Attendance, Commission, CustomerSession, Booking, UserBranch
+  Invoice, InvoiceItem, Attendance, Commission, CustomerSession, Booking, UserBranch,
+  PaymentMethod, GalleryImage,
 };

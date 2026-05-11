@@ -1,4 +1,4 @@
-import { CustomerSession, Customer, Branch, Assignment, Service, User, Invoice, InvoiceItem, Commission, AssignmentService, sequelize } from '../models/index.js';
+import { CustomerSession, Customer, Branch, Assignment, Service, User, Invoice, InvoiceItem, Commission, AssignmentService, PaymentMethod, sequelize } from '../models/index.js';
 
 export async function listActiveSessions(req, res) {
     try {
@@ -74,6 +74,7 @@ export async function completeSession(req, res) {
     const t = await sequelize.transaction();
     try {
         const { id } = req.params;
+        const { paymentMethodId } = req.body || {};
         const session = await CustomerSession.findByPk(id, {
             include: [
                 {
@@ -155,11 +156,23 @@ export async function completeSession(req, res) {
         // 3. Create Official Invoice
         let createdInvoiceId = null;
         if (totalAmount > 0) {
+            let paymentMethodSnapshot = null;
+            let resolvedPaymentMethodId = null;
+            if (paymentMethodId) {
+                const pm = await PaymentMethod.findByPk(paymentMethodId, { transaction: t });
+                if (pm) {
+                    resolvedPaymentMethodId = pm.id;
+                    paymentMethodSnapshot = pm.accountInfo ? `${pm.name} • ${pm.accountInfo}` : pm.name;
+                }
+            }
+
             const invoice = await Invoice.create({
                 CustomerId: session.CustomerId,
                 totalAmount: totalAmount.toFixed(2),
                 paidAmount: totalAmount.toFixed(2),
-                status: 'paid'
+                status: 'paid',
+                PaymentMethodId: resolvedPaymentMethodId,
+                paymentMethodSnapshot,
             }, { transaction: t });
             createdInvoiceId = invoice.id;
 

@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import bcrypt from 'bcryptjs';
-import { sequelize, Branch, User, Service, Customer } from '../models/index.js';
+import { sequelize, Branch, User, Service, Customer, PaymentMethod } from '../models/index.js';
 
 async function main() {
   await sequelize.sync({ force: true });
@@ -22,6 +22,13 @@ async function main() {
   await Service.create({ name: 'Facial', type: 'facial', price: 150.00, status: 'active', BranchId: b1.id });
 
   await Customer.create({ name: 'John Doe', phone: '0912345678', BranchId: b2.id, checkInTime: new Date() });
+
+  await PaymentMethod.bulkCreate([
+    { name: 'Cash', type: 'cash', status: 'active', order: 0 },
+    { name: 'Commercial Bank of Ethiopia', type: 'bank', status: 'active', order: 1 },
+    { name: 'Bank of Abyssinia', type: 'bank', status: 'active', order: 2 },
+    { name: 'Telebirr', type: 'bank', status: 'active', order: 3 },
+  ]);
 
   console.log('Seeded. Log in with username=admin password=Admin@123');
   process.exit(0);
