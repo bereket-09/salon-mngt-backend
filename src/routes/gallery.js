@@ -1,10 +1,16 @@
 import express from 'express';
-import { listGalleryImages, addGalleryImage, deleteGalleryImage, upload } from '../controllers/galleryController.js';
-// No authentication needed for listing, only for management
+import {
+    listGalleryImages,
+    addGalleryImage,
+    deleteGalleryImage,
+    getGalleryImageBinary,
+    upload,
+} from '../controllers/galleryController.js';
 
 const router = express.Router();
 
 router.get('/', listGalleryImages);
+router.get('/:id/image', getGalleryImageBinary);
 router.post('/', upload.single('image'), addGalleryImage);
 router.delete('/:id', deleteGalleryImage);
 

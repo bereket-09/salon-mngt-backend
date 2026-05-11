@@ -1,11 +1,15 @@
 import { Sequelize, DataTypes } from 'sequelize';
 import { dbConfig } from '../config/database.js';
 
-export const sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbConfig.password, {
-  host: dbConfig.host,
-  port: dbConfig.port,
+if (!dbConfig.url) {
+  throw new Error('DATABASE_URL is not set. Add your Neon connection string to .env');
+}
+
+export const sequelize = new Sequelize(dbConfig.url, {
   dialect: dbConfig.dialect,
-  logging: dbConfig.logging
+  logging: dbConfig.logging,
+  dialectOptions: dbConfig.dialectOptions,
+  pool: dbConfig.pool,
 });
 
 // ─── Models ──────────────────────────────────────────────────────────────────
@@ -13,12 +17,12 @@ export const sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbC
 export const Branch = sequelize.define('Branch', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name: { type: DataTypes.STRING, allowNull: false },
-  type: { type: DataTypes.ENUM('male', 'female', 'both'), allowNull: false, defaultValue: 'both' },
+  type: { type: DataTypes.STRING, allowNull: false, defaultValue: 'both' },
   location: { type: DataTypes.STRING },
   phone: { type: DataTypes.STRING },
   latitude: { type: DataTypes.DECIMAL(10, 8), allowNull: true },
   longitude: { type: DataTypes.DECIMAL(11, 8), allowNull: true },
-  status: { type: DataTypes.ENUM('active', 'inactive'), allowNull: false, defaultValue: 'active' },
+  status: { type: DataTypes.STRING, allowNull: false, defaultValue: 'active' },
 }, { tableName: 'branches' });
 
 export const User = sequelize.define('User', {
@@ -26,9 +30,9 @@ export const User = sequelize.define('User', {
   name: { type: DataTypes.STRING, allowNull: false },
   username: { type: DataTypes.STRING, allowNull: false, unique: true },
   passwordHash: { type: DataTypes.STRING, allowNull: false },
-  role: { type: DataTypes.ENUM('admin', 'receptionist', 'employee', 'manager'), allowNull: false, defaultValue: 'employee' },
-  status: { type: DataTypes.ENUM('active', 'inactive', 'on_leave'), allowNull: false, defaultValue: 'active' },
-  commissionRate: { type: DataTypes.DECIMAL(5, 2), allowNull: true }, // per-employee override
+  role: { type: DataTypes.STRING, allowNull: false, defaultValue: 'employee' },
+  status: { type: DataTypes.STRING, allowNull: false, defaultValue: 'active' },
+  commissionRate: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
   phone: { type: DataTypes.STRING },
 }, { tableName: 'users' });
 
@@ -39,7 +43,7 @@ export const Customer = sequelize.define('Customer', {
   email: { type: DataTypes.STRING },
   checkInTime: { type: DataTypes.DATE },
   checkOutTime: { type: DataTypes.DATE },
-  status: { type: DataTypes.ENUM('active', 'checked_in', 'completed'), defaultValue: 'active' }
+  status: { type: DataTypes.STRING, defaultValue: 'active' }
 }, { tableName: 'customers' });
 
 export const Service = sequelize.define('Service', {
@@ -47,13 +51,13 @@ export const Service = sequelize.define('Service', {
   name: { type: DataTypes.STRING, allowNull: false },
   type: { type: DataTypes.STRING },
   price: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
-  gender: { type: DataTypes.ENUM('male', 'female', 'both'), allowNull: false, defaultValue: 'both' },
-  estimatedDuration: { type: DataTypes.INTEGER, defaultValue: 30 }, // minutes
+  gender: { type: DataTypes.STRING, allowNull: false, defaultValue: 'both' },
+  estimatedDuration: { type: DataTypes.INTEGER, defaultValue: 30 },
   commissionEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
-  commissionRate: { type: DataTypes.DECIMAL(5, 2), allowNull: true }, // per-service override
-  status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
+  commissionRate: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
+  status: { type: DataTypes.STRING, defaultValue: 'active' },
   code: { type: DataTypes.STRING, unique: true },
-}, { 
+}, {
   tableName: 'services',
   hooks: {
     afterCreate: async (service, options) => {
@@ -68,10 +72,7 @@ export const Service = sequelize.define('Service', {
 
 export const Assignment = sequelize.define('Assignment', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  status: {
-    type: DataTypes.ENUM('assigned', 'pending', 'in_progress', 'waiting', 'completed', 'rejected'),
-    defaultValue: 'assigned'
-  },
+  status: { type: DataTypes.STRING, defaultValue: 'assigned' },
   assignedAt: { type: DataTypes.DATE, defaultValue: Sequelize.NOW },
   employeeId: { type: DataTypes.INTEGER, allowNull: true },
   completedAt: { type: DataTypes.DATE },
@@ -81,17 +82,14 @@ export const Assignment = sequelize.define('Assignment', {
 export const AssignmentService = sequelize.define('AssignmentService', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   priceAtTime: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
-  status: {
-    type: DataTypes.ENUM('assigned', 'pending', 'in_progress', 'waiting', 'completed', 'rejected'),
-    defaultValue: 'assigned'
-  },
+  status: { type: DataTypes.STRING, defaultValue: 'assigned' },
 }, { tableName: 'assignment_service' });
 
 export const Invoice = sequelize.define('Invoice', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   totalAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
   paidAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
-  status: { type: DataTypes.ENUM('pending', 'paid'), defaultValue: 'pending' },
+  status: { type: DataTypes.STRING, defaultValue: 'pending' },
 }, { tableName: 'invoices' });
 
 export const InvoiceItem = sequelize.define('InvoiceItem', {
@@ -107,18 +105,18 @@ export const Attendance = sequelize.define('Attendance', {
   totalHours: { type: DataTypes.DECIMAL(5, 2), defaultValue: 0 },
   breakMinutes: { type: DataTypes.INTEGER, defaultValue: 0 },
   lastBreakStartTime: { type: DataTypes.DATE },
-  status: { type: DataTypes.ENUM('present', 'absent', 'on_leave', 'on_break'), defaultValue: 'present' },
+  status: { type: DataTypes.STRING, defaultValue: 'present' },
   lat: { type: DataTypes.FLOAT },
   lng: { type: DataTypes.FLOAT },
-  events: { type: DataTypes.JSON }, // Store all actions for audit
+  events: { type: DataTypes.JSONB },
   BranchId: { type: DataTypes.INTEGER, allowNull: true },
-  UserId: { type: DataTypes.INTEGER, allowNull: false }, // Explicit for clarity
+  UserId: { type: DataTypes.INTEGER, allowNull: false },
 }, { tableName: 'attendance' });
 
 export const Commission = sequelize.define('Commission', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
-  status: { type: DataTypes.ENUM('unpaid', 'paid'), defaultValue: 'unpaid' }
+  status: { type: DataTypes.STRING, defaultValue: 'unpaid' }
 }, { tableName: 'commissions' });
 
 export const CustomerSession = sequelize.define(
@@ -127,26 +125,22 @@ export const CustomerSession = sequelize.define(
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     checkInTime: { type: DataTypes.DATE, allowNull: false },
     checkOutTime: { type: DataTypes.DATE },
-    status: { type: DataTypes.ENUM('checked_in', 'completed'), defaultValue: 'checked_in' },
+    status: { type: DataTypes.STRING, defaultValue: 'checked_in' },
     BranchId: { type: DataTypes.INTEGER, allowNull: true },
   },
   { tableName: 'customer_sessions' }
 );
 
-// NEW: Pre-booking model (from landing page)
 export const Booking = sequelize.define('Booking', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   customerName: { type: DataTypes.STRING, allowNull: false },
   phone: { type: DataTypes.STRING, allowNull: false },
   email: { type: DataTypes.STRING },
-  serviceIds: { type: DataTypes.JSON, defaultValue: [] }, // array of service IDs
+  serviceIds: { type: DataTypes.JSONB, defaultValue: [] },
   preferredDate: { type: DataTypes.DATEONLY },
-  preferredTime: { type: DataTypes.STRING }, // "10:30"
+  preferredTime: { type: DataTypes.STRING },
   notes: { type: DataTypes.TEXT },
-  status: {
-    type: DataTypes.ENUM('pending', 'confirmed', 'cancelled', 'completed'),
-    defaultValue: 'pending'
-  },
+  status: { type: DataTypes.STRING, defaultValue: 'pending' },
   convertedToSessionId: { type: DataTypes.INTEGER, allowNull: true },
   BranchId: { type: DataTypes.INTEGER, allowNull: true },
   EmployeeId: { type: DataTypes.INTEGER, allowNull: true },
@@ -154,11 +148,13 @@ export const Booking = sequelize.define('Booking', {
 
 export const GalleryImage = sequelize.define('GalleryImage', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  url: { type: DataTypes.STRING, allowNull: false },
+  url: { type: DataTypes.STRING, allowNull: true },
+  data: { type: DataTypes.BLOB, allowNull: true },
+  mimeType: { type: DataTypes.STRING, allowNull: true },
   title: { type: DataTypes.STRING },
   description: { type: DataTypes.TEXT },
   order: { type: DataTypes.INTEGER, defaultValue: 0 },
-  status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
+  status: { type: DataTypes.STRING, defaultValue: 'active' },
 }, { tableName: 'gallery_images' });
 
 export const UserBranch = sequelize.define('UserBranch', {

@@ -1,0 +1,244 @@
+const { Sequelize, DataTypes } = require('sequelize')
+const { dbConfig } = require('../config/database')
+
+const sequelize = exports.sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbConfig.password, {
+  host: dbConfig.host,
+  port: dbConfig.port,
+  dialect: dbConfig.dialect,
+  logging: dbConfig.logging
+});
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+const Branch = exports.Branch = sequelize.define('Branch', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  type: { type: DataTypes.ENUM('male', 'female', 'both'), allowNull: false, defaultValue: 'both' },
+  location: { type: DataTypes.STRING },
+  phone: { type: DataTypes.STRING },
+  latitude: { type: DataTypes.DECIMAL(10, 8), allowNull: true },
+  longitude: { type: DataTypes.DECIMAL(11, 8), allowNull: true },
+  status: { type: DataTypes.ENUM('active', 'inactive'), allowNull: false, defaultValue: 'active' },
+}, { tableName: 'branches' });
+
+const User = exports.User = sequelize.define('User', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  username: { type: DataTypes.STRING, allowNull: false, unique: true },
+  passwordHash: { type: DataTypes.STRING, allowNull: false },
+  role: { type: DataTypes.ENUM('admin', 'receptionist', 'employee', 'manager'), allowNull: false, defaultValue: 'employee' },
+  status: { type: DataTypes.ENUM('active', 'inactive', 'on_leave'), allowNull: false, defaultValue: 'active' },
+  commissionRate: { type: DataTypes.DECIMAL(5, 2), allowNull: true }, // per-employee override
+  phone: { type: DataTypes.STRING },
+}, { tableName: 'users' });
+
+const Customer = exports.Customer = sequelize.define('Customer', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  phone: { type: DataTypes.STRING, allowNull: false },
+  email: { type: DataTypes.STRING },
+  checkInTime: { type: DataTypes.DATE },
+  checkOutTime: { type: DataTypes.DATE },
+  status: { type: DataTypes.ENUM('active', 'checked_in', 'completed'), defaultValue: 'active' }
+}, { tableName: 'customers' });
+
+const Service = exports.Service = sequelize.define('Service', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  type: { type: DataTypes.STRING },
+  price: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  gender: { type: DataTypes.ENUM('male', 'female', 'both'), allowNull: false, defaultValue: 'both' },
+  estimatedDuration: { type: DataTypes.INTEGER, defaultValue: 30 }, // minutes
+  commissionEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
+  commissionRate: { type: DataTypes.DECIMAL(5, 2), allowNull: true }, // per-service override
+  status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
+  code: { type: DataTypes.STRING, unique: true },
+}, { 
+  tableName: 'services',
+  hooks: {
+    afterCreate: async (service, options) => {
+      if (!service.code) {
+        const prefix = service.name.substring(0, 3).toUpperCase();
+        service.code = `${prefix}-${service.id}`;
+        await service.save({ transaction: options.transaction });
+      }
+    }
+  }
+});
+
+const Assignment = exports.Assignment = sequelize.define('Assignment', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  status: {
+    type: DataTypes.ENUM('assigned', 'pending', 'in_progress', 'waiting', 'completed', 'rejected'),
+    defaultValue: 'assigned'
+  },
+  assignedAt: { type: DataTypes.DATE, defaultValue: Sequelize.NOW },
+  employeeId: { type: DataTypes.INTEGER, allowNull: true },
+  completedAt: { type: DataTypes.DATE },
+  notes: { type: DataTypes.TEXT },
+}, { tableName: 'assignments' });
+
+const AssignmentService = exports.AssignmentService = sequelize.define('AssignmentService', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  priceAtTime: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  status: {
+    type: DataTypes.ENUM('assigned', 'pending', 'in_progress', 'waiting', 'completed', 'rejected'),
+    defaultValue: 'assigned'
+  },
+}, { tableName: 'assignment_service' });
+
+const Invoice = exports.Invoice = sequelize.define('Invoice', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  totalAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  paidAmount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  status: { type: DataTypes.ENUM('pending', 'paid'), defaultValue: 'pending' },
+}, { tableName: 'invoices' });
+
+const InvoiceItem = exports.InvoiceItem = sequelize.define('InvoiceItem', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  price: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+}, { tableName: 'invoice_items' });
+
+const Attendance = exports.Attendance = sequelize.define('Attendance', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  date: { type: DataTypes.DATEONLY, allowNull: false },
+  checkInTime: { type: DataTypes.DATE },
+  checkOutTime: { type: DataTypes.DATE },
+  totalHours: { type: DataTypes.DECIMAL(5, 2), defaultValue: 0 },
+  breakMinutes: { type: DataTypes.INTEGER, defaultValue: 0 },
+  lastBreakStartTime: { type: DataTypes.DATE },
+  status: { type: DataTypes.ENUM('present', 'absent', 'on_leave', 'on_break'), defaultValue: 'present' },
+  lat: { type: DataTypes.FLOAT },
+  lng: { type: DataTypes.FLOAT },
+  events: { type: DataTypes.JSON }, // Store all actions for audit
+  BranchId: { type: DataTypes.INTEGER, allowNull: true },
+  UserId: { type: DataTypes.INTEGER, allowNull: false }, // Explicit for clarity
+}, { tableName: 'attendance' });
+
+const Commission = exports.Commission = sequelize.define('Commission', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  status: { type: DataTypes.ENUM('unpaid', 'paid'), defaultValue: 'unpaid' }
+}, { tableName: 'commissions' });
+
+const CustomerSession = exports.CustomerSession = sequelize.define(
+  'CustomerSession',
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    checkInTime: { type: DataTypes.DATE, allowNull: false },
+    checkOutTime: { type: DataTypes.DATE },
+    status: { type: DataTypes.ENUM('checked_in', 'completed'), defaultValue: 'checked_in' },
+    BranchId: { type: DataTypes.INTEGER, allowNull: true },
+  },
+  { tableName: 'customer_sessions' }
+);
+
+// NEW: Pre-booking model (from landing page)
+const Booking = exports.Booking = sequelize.define('Booking', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  customerName: { type: DataTypes.STRING, allowNull: false },
+  phone: { type: DataTypes.STRING, allowNull: false },
+  email: { type: DataTypes.STRING },
+  serviceIds: { type: DataTypes.JSON, defaultValue: [] }, // array of service IDs
+  preferredDate: { type: DataTypes.DATEONLY },
+  preferredTime: { type: DataTypes.STRING }, // "10:30"
+  notes: { type: DataTypes.TEXT },
+  status: {
+    type: DataTypes.ENUM('pending', 'confirmed', 'cancelled', 'completed'),
+    defaultValue: 'pending'
+  },
+  convertedToSessionId: { type: DataTypes.INTEGER, allowNull: true },
+  BranchId: { type: DataTypes.INTEGER, allowNull: true },
+  EmployeeId: { type: DataTypes.INTEGER, allowNull: true },
+}, { tableName: 'bookings' });
+
+const GalleryImage = exports.GalleryImage = sequelize.define('GalleryImage', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  url: { type: DataTypes.STRING, allowNull: false },
+  title: { type: DataTypes.STRING },
+  description: { type: DataTypes.TEXT },
+  order: { type: DataTypes.INTEGER, defaultValue: 0 },
+  status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
+}, { tableName: 'gallery_images' });
+
+const UserBranch = exports.UserBranch = sequelize.define('UserBranch', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+}, { tableName: 'user_branches' });
+
+// ─── Relationships ────────────────────────────────────────────────────────────
+
+// Many-to-many: User <-> Branch through UserBranch
+User.belongsToMany(Branch, { through: UserBranch });
+Branch.belongsToMany(User, { through: UserBranch });
+User.belongsTo(Branch, { as: 'HomeBranch', foreignKey: 'BranchId' }); // Kept for backward compat/primary branch
+Branch.hasMany(User, { foreignKey: 'BranchId' });
+
+Branch.hasMany(Customer, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
+Customer.belongsTo(Branch);
+
+Branch.hasMany(Service, { foreignKey: { allowNull: true }, onDelete: 'SET NULL' });
+Service.belongsTo(Branch);
+
+User.hasMany(Attendance, { foreignKey: 'UserId', onDelete: 'CASCADE' });
+Attendance.belongsTo(User, { foreignKey: 'UserId' });
+
+Branch.hasMany(Attendance, { foreignKey: 'BranchId', onDelete: 'SET NULL' });
+Attendance.belongsTo(Branch, { foreignKey: 'BranchId' });
+
+Customer.hasMany(Assignment, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
+Assignment.belongsTo(Customer);
+
+User.hasMany(Assignment, { as: 'EmployeeAssignments', foreignKey: 'employeeId', onDelete: 'CASCADE' });
+Assignment.belongsTo(User, { as: 'Employee', foreignKey: 'employeeId' });
+
+// Many-to-many: Assignment <-> Service through AssignmentService
+Assignment.belongsToMany(Service, { through: AssignmentService });
+Service.belongsToMany(Assignment, { through: AssignmentService });
+
+// Invoices
+Customer.hasMany(Invoice, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
+Invoice.belongsTo(Customer);
+
+Invoice.hasMany(InvoiceItem, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
+InvoiceItem.belongsTo(Invoice);
+
+Assignment.hasMany(InvoiceItem, { foreignKey: { allowNull: true }, onDelete: 'SET NULL' });
+InvoiceItem.belongsTo(Assignment);
+
+Service.hasMany(InvoiceItem, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
+InvoiceItem.belongsTo(Service);
+
+// Commissions
+User.hasMany(Commission, { as: 'EmployeeCommissions', foreignKey: { name: 'employeeId', allowNull: false }, onDelete: 'CASCADE' });
+Commission.belongsTo(User, { as: 'Employee', foreignKey: 'employeeId' });
+
+Assignment.hasOne(Commission, { foreignKey: { name: 'assignmentId', allowNull: false }, onDelete: 'CASCADE' });
+Commission.belongsTo(Assignment, { foreignKey: 'assignmentId' });
+
+// CustomerSession
+Customer.hasMany(CustomerSession, { foreignKey: { allowNull: false }, onDelete: 'CASCADE' });
+CustomerSession.belongsTo(Customer);
+
+Assignment.belongsTo(CustomerSession, { foreignKey: { allowNull: true }, onDelete: 'CASCADE' });
+CustomerSession.hasMany(Assignment);
+
+Branch.hasMany(CustomerSession, { foreignKey: { allowNull: true }, onDelete: 'SET NULL' });
+CustomerSession.belongsTo(Branch);
+
+AssignmentService.belongsTo(Service, { foreignKey: 'ServiceId' });
+Service.hasMany(AssignmentService, { foreignKey: 'ServiceId' });
+
+AssignmentService.belongsTo(Assignment, { foreignKey: 'AssignmentId' });
+Assignment.hasMany(AssignmentService, { foreignKey: 'AssignmentId' });
+
+// Booking
+Branch.hasMany(Booking, { foreignKey: { allowNull: true }, onDelete: 'SET NULL' });
+Booking.belongsTo(Branch);
+
+User.hasMany(Booking, { foreignKey: 'EmployeeId' });
+Booking.belongsTo(User, { as: 'Specialist', foreignKey: 'EmployeeId' });
+
+module.exports = {
+  sequelize, Branch, User, Customer, Service, Assignment, AssignmentService,
+  Invoice, InvoiceItem, Attendance, Commission, CustomerSession, Booking, UserBranch
+};
