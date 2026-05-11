@@ -1,4 +1,5 @@
 import { Sequelize, DataTypes } from 'sequelize';
+import pg from 'pg';
 import { dbConfig } from '../config/database.js';
 
 if (!dbConfig.url) {
@@ -7,6 +8,7 @@ if (!dbConfig.url) {
 
 export const sequelize = new Sequelize(dbConfig.url, {
   dialect: dbConfig.dialect,
+  dialectModule: pg,
   logging: dbConfig.logging,
   dialectOptions: dbConfig.dialectOptions,
   pool: dbConfig.pool,

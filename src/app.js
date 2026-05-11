@@ -51,9 +51,11 @@ app.use('/reports', reportRoutes);
 app.use('/sessions', sessionRoutes);
 app.use('/gallery', galleryRoutes);
 
-(async () => {
-  await sequelize.sync({ alter: true }); // alter: true to apply schema changes without dropping data
-  console.log('DB synced');
-})();
+if (process.env.RUN_SYNC === '1') {
+  (async () => {
+    await sequelize.sync({ alter: true });
+    console.log('DB synced');
+  })();
+}
 
 export default app;
