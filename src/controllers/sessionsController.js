@@ -124,14 +124,14 @@ export async function completeSession(req, res) {
                 const price = parseFloat(as.priceAtTime || 0);
                 totalAmount += price;
 
-                // Commission logic
-                if (as.Service && as.Service.commissionEnabled && assignment.Employee) {
+                // Commission only when BOTH the service has commissionEnabled AND the employee is commission-eligible.
+                const serviceEligible = as.Service && as.Service.commissionEnabled;
+                const employeeEligible = assignment.Employee && assignment.Employee.commissionEnabled;
+                if (serviceEligible && employeeEligible) {
                     const sRate = parseFloat(as.Service.commissionRate);
                     const eRate = parseFloat(assignment.Employee.commissionRate);
-                    
-                    // Priority: Service Rate > Employee Rate > Default 10%
+                    // Rates are stored as integer percent (1–99). Priority: Service Rate > Employee Rate > 10%.
                     const effectiveRate = (!isNaN(sRate) && sRate > 0) ? sRate : ((!isNaN(eRate) && eRate > 0) ? eRate : 10);
-                    
                     assignmentCommission += price * (effectiveRate / 100);
                 }
             }

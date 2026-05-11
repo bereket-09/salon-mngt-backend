@@ -34,6 +34,7 @@ export const User = sequelize.define('User', {
   passwordHash: { type: DataTypes.STRING, allowNull: false },
   role: { type: DataTypes.STRING, allowNull: false, defaultValue: 'employee' },
   status: { type: DataTypes.STRING, allowNull: false, defaultValue: 'active' },
+  commissionEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
   commissionRate: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
   phone: { type: DataTypes.STRING },
 }, { tableName: 'users' });

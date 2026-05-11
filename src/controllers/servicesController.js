@@ -3,6 +3,13 @@ import { Sequelize } from 'sequelize';
 
 const { Op } = Sequelize;
 
+const clampPercent = (v) => {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  if (Number.isNaN(n)) return null;
+  return Math.max(1, Math.min(99, Math.round(n)));
+};
+
 // Create a new service
 export async function createService(req, res) {
   const {
@@ -20,7 +27,7 @@ export async function createService(req, res) {
       gender,
       estimatedDuration,
       commissionEnabled,
-      commissionRate: commissionEnabled ? commissionRate : null,
+      commissionRate: commissionEnabled ? clampPercent(commissionRate) : null,
     });
     res.json(svc);
   } catch (err) {
@@ -33,16 +40,22 @@ export async function createService(req, res) {
 export async function listServices(req, res) {
   try {
     const { gender, branchId, status, search } = req.query;
-    const where = {};
-    if (gender) where.gender = gender;
-    if (branchId) where.BranchId = branchId;
-    if (status) where.status = status;
-    if (search) {
-      where[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { code: { [Op.like]: `%${search}%` } }
-      ];
+    const andClauses = [];
+    if (gender) andClauses.push({ gender });
+    if (status) andClauses.push({ status });
+    if (branchId && branchId !== 'all') {
+      // Branch-scoped: include services tied to that branch AND services with no branch (=available everywhere)
+      andClauses.push({ [Op.or]: [{ BranchId: branchId }, { BranchId: null }] });
     }
+    if (search) {
+      andClauses.push({
+        [Op.or]: [
+          { name: { [Op.iLike]: `%${search}%` } },
+          { code: { [Op.iLike]: `%${search}%` } },
+        ],
+      });
+    }
+    const where = andClauses.length ? { [Op.and]: andClauses } : {};
 
     const list = await Service.findAll({ where, include: [Branch] });
     res.json(list);
@@ -72,8 +85,8 @@ export async function updateService(req, res) {
     if (req.body.BranchId !== undefined) service.BranchId = req.body.BranchId; // Support both casings
     if (gender !== undefined) service.gender = gender;
     if (estimatedDuration !== undefined) service.estimatedDuration = parseInt(estimatedDuration, 10);
-    if (commissionEnabled !== undefined) service.commissionEnabled = commissionEnabled;
-    if (commissionRate !== undefined) service.commissionRate = parseFloat(commissionRate);
+    if (commissionEnabled !== undefined) service.commissionEnabled = !!commissionEnabled;
+    if (commissionRate !== undefined) service.commissionRate = service.commissionEnabled ? clampPercent(commissionRate) : null;
 
     await service.save();
     res.json(service);

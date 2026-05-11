@@ -4,12 +4,22 @@ import { User, Branch } from '../models/index.js';
 
 export async function register(req, res) {
   try {
-    const { name, username, password, role='employee', branchIds=[] } = req.body;
+    const { name, username, password, role='employee', branchIds=[], commissionEnabled = false, commissionRate, phone } = req.body;
     if (!name || !username || !password) return res.status(400).json({ error: 'Missing fields' });
     const existing = await User.findOne({ where: { username } });
     if (existing) return res.status(409).json({ error: 'Username already exists' });
     const hash = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, username, passwordHash: hash, role, BranchId: branchIds[0] || null });
+    let safeRate = null;
+    if (commissionEnabled && commissionRate !== undefined && commissionRate !== '' && commissionRate !== null) {
+      safeRate = Math.max(1, Math.min(99, Math.round(Number(commissionRate))));
+    }
+    const user = await User.create({
+      name, username, passwordHash: hash, role,
+      BranchId: branchIds[0] || null,
+      commissionEnabled: !!commissionEnabled,
+      commissionRate: safeRate,
+      phone,
+    });
     
     if (branchIds.length > 0) {
       await user.setBranches(branchIds);

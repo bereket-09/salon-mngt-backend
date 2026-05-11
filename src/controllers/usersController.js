@@ -1,13 +1,20 @@
 import { User, Branch } from '../models/index.js';
 import bcrypt from 'bcryptjs';
+import { Sequelize } from 'sequelize';
+
+const { Op } = Sequelize;
 
 // List all users
 export async function listUsers(req, res) {
   const { role, branchId, status } = req.query;
-  const where = {};
-  if (role) where.role = role;
-  if (branchId) where.BranchId = branchId;
-  if (status) where.status = status;
+  const andClauses = [];
+  if (role) andClauses.push({ role });
+  if (status) andClauses.push({ status });
+  if (branchId && branchId !== 'all') {
+    // BranchId=null means "available in every branch"
+    andClauses.push({ [Op.or]: [{ BranchId: branchId }, { BranchId: null }] });
+  }
+  const where = andClauses.length ? { [Op.and]: andClauses } : {};
   const users = await User.findAll({ where, include: [Branch], attributes: { exclude: ['passwordHash'] } });
   res.json(users);
 }
@@ -21,14 +28,20 @@ export async function getMe(req, res) {
 // Update user by ID
 export async function updateUser(req, res) {
   const { id } = req.params;
-    const { name, username, role, status, branchIds, commissionRate, phone, password } = req.body;
-  
+    const { name, username, role, status, branchIds, commissionEnabled, commissionRate, phone, password } = req.body;
+
     try {
       const user = await User.findByPk(id);
       if (!user) return res.status(404).json({ message: 'User not found' });
-  
-      const updateData = { name, username, role, status, commissionRate, phone };
+
+      const updateData = { name, username, role, status, phone };
+      if (commissionEnabled !== undefined) updateData.commissionEnabled = !!commissionEnabled;
+      if (commissionRate !== undefined && commissionRate !== '' && commissionRate !== null) {
+        const r = Math.max(1, Math.min(99, Math.round(Number(commissionRate))));
+        updateData.commissionRate = r;
+      }
       if (branchIds && branchIds.length > 0) updateData.BranchId = branchIds[0];
+      else if (branchIds && branchIds.length === 0) updateData.BranchId = null;
   
       if (password && password.trim() !== '') {
         updateData.passwordHash = await bcrypt.hash(password, 10);
