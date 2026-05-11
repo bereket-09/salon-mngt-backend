@@ -18,7 +18,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Tactical Request Logger
+app.use((req, res, next) => {
+  if (!/^\/gallery\/\d+\/image$/.test(req.path)) {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
