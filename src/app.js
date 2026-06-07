@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import branchRoutes from './routes/branches.js';
 import serviceRoutes from './routes/services.js';
+import serviceCategoryRoutes from './routes/serviceCategories.js';
 import customerRoutes from './routes/customers.js';
 import assignmentRoutes from './routes/assignments.js';
 import invoiceRoutes from './routes/invoices.js';
@@ -18,6 +19,14 @@ import paymentMethodsRoutes from './routes/paymentMethods.js';
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Multi-branch: the admin "All Branches" selector sends branchId=all to mean
+// "aggregated / no branch filter". Normalize it once here so every controller
+// treats it consistently as the absence of a branch filter.
+app.use((req, res, next) => {
+  if (req.query && req.query.branchId === 'all') delete req.query.branchId;
+  next();
+});
 
 app.use((req, res, next) => {
   const isBinary = /^\/gallery\/\d+\/image$/.test(req.path) || /^\/payment-methods\/\d+\/logo$/.test(req.path);
@@ -44,6 +53,7 @@ app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/branches', branchRoutes);
 app.use('/services', serviceRoutes);
+app.use('/service-categories', serviceCategoryRoutes);
 app.use('/customers', customerRoutes);
 app.use('/assignments', assignmentRoutes);
 app.use('/invoices', invoiceRoutes);

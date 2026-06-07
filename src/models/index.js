@@ -49,6 +49,16 @@ export const Customer = sequelize.define('Customer', {
   status: { type: DataTypes.STRING, defaultValue: 'active' }
 }, { tableName: 'customers' });
 
+export const ServiceCategory = sequelize.define('ServiceCategory', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  parentId: { type: DataTypes.INTEGER, allowNull: true }, // null = super-category, set = sub-category
+  icon: { type: DataTypes.STRING, allowNull: true },
+  color: { type: DataTypes.STRING, allowNull: true },
+  order: { type: DataTypes.INTEGER, defaultValue: 0 },
+  status: { type: DataTypes.STRING, defaultValue: 'active' },
+}, { tableName: 'service_categories' });
+
 export const Service = sequelize.define('Service', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name: { type: DataTypes.STRING, allowNull: false },
@@ -176,6 +186,10 @@ export const UserBranch = sequelize.define('UserBranch', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 }, { tableName: 'user_branches' });
 
+export const UserCategory = sequelize.define('UserCategory', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+}, { tableName: 'user_categories' });
+
 // ─── Relationships ────────────────────────────────────────────────────────────
 
 // Many-to-many: User <-> Branch through UserBranch
@@ -189,6 +203,17 @@ Customer.belongsTo(Branch);
 
 Branch.hasMany(Service, { foreignKey: { allowNull: true }, onDelete: 'SET NULL' });
 Service.belongsTo(Branch);
+
+// Service categories (two-level: super-category -> sub-category via self-reference)
+ServiceCategory.belongsTo(ServiceCategory, { as: 'Parent', foreignKey: 'parentId' });
+ServiceCategory.hasMany(ServiceCategory, { as: 'Children', foreignKey: 'parentId' });
+
+ServiceCategory.hasMany(Service, { foreignKey: { name: 'categoryId', allowNull: true }, onDelete: 'SET NULL' });
+Service.belongsTo(ServiceCategory, { as: 'Category', foreignKey: 'categoryId' });
+
+// Employee specialties: User <-> ServiceCategory many-to-many
+User.belongsToMany(ServiceCategory, { through: UserCategory, as: 'Specialties', foreignKey: 'UserId', otherKey: 'ServiceCategoryId' });
+ServiceCategory.belongsToMany(User, { through: UserCategory, as: 'Specialists', foreignKey: 'ServiceCategoryId', otherKey: 'UserId' });
 
 User.hasMany(Attendance, { foreignKey: 'UserId', onDelete: 'CASCADE' });
 Attendance.belongsTo(User, { foreignKey: 'UserId' });
@@ -253,7 +278,7 @@ User.hasMany(Booking, { foreignKey: 'EmployeeId' });
 Booking.belongsTo(User, { as: 'Specialist', foreignKey: 'EmployeeId' });
 
 export default {
-  sequelize, Branch, User, Customer, Service, Assignment, AssignmentService,
-  Invoice, InvoiceItem, Attendance, Commission, CustomerSession, Booking, UserBranch,
+  sequelize, Branch, User, Customer, Service, ServiceCategory, Assignment, AssignmentService,
+  Invoice, InvoiceItem, Attendance, Commission, CustomerSession, Booking, UserBranch, UserCategory,
   PaymentMethod, GalleryImage,
 };

@@ -1,6 +1,32 @@
-import { sequelize, Assignment, Customer, User, Service, AssignmentService, Commission, CustomerSession } from '../models/index.js';
+import { sequelize, Assignment, Customer, User, Service, ServiceCategory, AssignmentService, Commission, CustomerSession } from '../models/index.js';
 
 function toDecimal(n) { return Number.parseFloat(n).toFixed(2); }
+
+// Soft check: does the employee's specialty set cover the categories of these services?
+// Returns an array of human-readable warnings (empty = fully eligible). Never blocks.
+async function specialtyWarnings(employeeId, serviceIds) {
+  if (!employeeId || !Array.isArray(serviceIds) || serviceIds.length === 0) return [];
+  const employee = await User.findByPk(employeeId, {
+    include: [{ model: ServiceCategory, as: 'Specialties', through: { attributes: [] } }],
+  });
+  if (!employee) return [];
+  const specIds = new Set((employee.Specialties || []).map((c) => c.id));
+  if (specIds.size === 0) return []; // no specialties set => treat as generalist, no warning
+
+  const services = await Service.findAll({
+    where: { id: serviceIds },
+    include: [{ model: ServiceCategory, as: 'Category' }],
+  });
+  const warnings = [];
+  for (const s of services) {
+    if (!s.categoryId) continue; // uncategorized service => skip
+    const matches = specIds.has(s.categoryId) || (s.Category?.parentId && specIds.has(s.Category.parentId));
+    if (!matches) {
+      warnings.push(`${employee.name} is not tagged for "${s.Category?.name || s.name}"`);
+    }
+  }
+  return warnings;
+}
 
 // Create a new assignment
 export async function createAssignment(req, res) {
@@ -30,8 +56,9 @@ export async function createAssignment(req, res) {
       }
     }
 
+    const warnings = await specialtyWarnings(employeeId, serviceIds);
     const created = await Assignment.findByPk(a.id, { include: [Service, { model: User, as: 'Employee' }] });
-    res.json(created);
+    res.json({ ...created.toJSON(), warnings });
   } catch (err) {
     console.error('createAssignment error:', err);
     res.status(500).json({ error: 'Failed to create assignment' });

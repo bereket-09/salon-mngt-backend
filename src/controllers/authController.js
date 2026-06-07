@@ -4,7 +4,7 @@ import { User, Branch } from '../models/index.js';
 
 export async function register(req, res) {
   try {
-    const { name, username, password, role='employee', branchIds=[], commissionEnabled = false, commissionRate, phone } = req.body;
+    const { name, username, password, role='employee', branchIds=[], categoryIds=[], commissionEnabled = false, commissionRate, phone } = req.body;
     if (!name || !username || !password) return res.status(400).json({ error: 'Missing fields' });
     const existing = await User.findOne({ where: { username } });
     if (existing) return res.status(409).json({ error: 'Username already exists' });
@@ -23,6 +23,9 @@ export async function register(req, res) {
     
     if (branchIds.length > 0) {
       await user.setBranches(branchIds);
+    }
+    if (categoryIds.length > 0) {
+      await user.setSpecialties(categoryIds);
     }
 
     return res.json({ id: user.id, name: user.name, username: user.username, role: user.role });
