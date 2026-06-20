@@ -19,25 +19,36 @@ async function main() {
   const emp2 = await User.create({ name: 'Hana Stylist', username: 'hana', passwordHash: empPass, role: 'employee', BranchId: b1.id });
 
   // ─── Service categories (two-level: super → sub) ────────────────────────────
-  const hair = await ServiceCategory.create({ name: 'Hair', icon: 'mdi:hair-dryer', color: '#C8972A', order: 0 });
-  const nails = await ServiceCategory.create({ name: 'Nails', icon: 'mdi:nail', color: '#EC4899', order: 1 });
-  const spa = await ServiceCategory.create({ name: 'Spa & Skin', icon: 'mdi:spa', color: '#2DD4BF', order: 2 });
+  // Initial super-categories
+  const hairMale   = await ServiceCategory.create({ name: 'Hair - Male',   icon: 'mdi:face-man',    color: '#2563EB', order: 0 });
+  const hairFemale = await ServiceCategory.create({ name: 'Hair - Female', icon: 'mdi:hair-dryer',   color: '#C8972A', order: 1 });
+  const eyelash    = await ServiceCategory.create({ name: 'Eyelash',       icon: 'mdi:eye-outline',  color: '#8B5CF6', order: 2 });
+  const nails      = await ServiceCategory.create({ name: 'Nail',          icon: 'mdi:nail',         color: '#EC4899', order: 3 });
+  const spa        = await ServiceCategory.create({ name: 'Spa',           icon: 'mdi:spa',          color: '#2DD4BF', order: 4 });
 
-  const hairCut = await ServiceCategory.create({ name: 'Haircut', parentId: hair.id, order: 0 });
-  const hairColor = await ServiceCategory.create({ name: 'Coloring', parentId: hair.id, order: 1 });
-  const hairWash = await ServiceCategory.create({ name: 'Wash & Treatment', parentId: hair.id, order: 2 });
-  const facialCat = await ServiceCategory.create({ name: 'Facial', parentId: spa.id, order: 0 });
-  const maniCat = await ServiceCategory.create({ name: 'Manicure', parentId: nails.id, order: 0 });
+  // Sub-categories
+  const menCut    = await ServiceCategory.create({ name: 'Haircut',          parentId: hairMale.id,   order: 0 });
+  const beardCat  = await ServiceCategory.create({ name: 'Beard & Shave',    parentId: hairMale.id,   order: 1 });
+  const womenCut  = await ServiceCategory.create({ name: 'Haircut',          parentId: hairFemale.id, order: 0 });
+  const hairColor = await ServiceCategory.create({ name: 'Coloring',         parentId: hairFemale.id, order: 1 });
+  const hairWash  = await ServiceCategory.create({ name: 'Wash & Treatment', parentId: hairFemale.id, order: 2 });
+  const lashExt   = await ServiceCategory.create({ name: 'Lash Extensions',  parentId: eyelash.id,    order: 0 });
+  const maniCat   = await ServiceCategory.create({ name: 'Manicure',         parentId: nails.id,      order: 0 });
+  const pediCat   = await ServiceCategory.create({ name: 'Pedicure',         parentId: nails.id,      order: 1 });
+  const facialCat = await ServiceCategory.create({ name: 'Facial',           parentId: spa.id,        order: 0 });
 
-  await Service.create({ name: 'Haircut', type: 'haircut', price: 100.00, status: 'active', BranchId: b2.id, categoryId: hairCut.id, gender: 'both' });
-  await Service.create({ name: 'Beard Trim', type: 'beard', price: 60.00, status: 'active', BranchId: b2.id, categoryId: hairCut.id, gender: 'male' });
+  await Service.create({ name: 'Haircut', type: 'haircut', price: 100.00, status: 'active', BranchId: b2.id, categoryId: menCut.id, gender: 'male' });
+  await Service.create({ name: 'Beard Trim', type: 'beard', price: 60.00, status: 'active', BranchId: b2.id, categoryId: beardCat.id, gender: 'male' });
+  await Service.create({ name: "Women's Haircut", type: 'haircut', price: 180.00, status: 'active', BranchId: b1.id, categoryId: womenCut.id, gender: 'female' });
   await Service.create({ name: 'Full Hair Color', type: 'color', price: 350.00, status: 'active', BranchId: b1.id, categoryId: hairColor.id, gender: 'female' });
   await Service.create({ name: 'Wash & Blow Dry', type: 'wash', price: 120.00, status: 'active', BranchId: b1.id, categoryId: hairWash.id, gender: 'female' });
-  await Service.create({ name: 'Facial', type: 'facial', price: 150.00, status: 'active', BranchId: b1.id, categoryId: facialCat.id, gender: 'both' });
+  await Service.create({ name: 'Lash Extensions', type: 'lash', price: 250.00, status: 'active', BranchId: b1.id, categoryId: lashExt.id, gender: 'female' });
   await Service.create({ name: 'Classic Manicure', type: 'manicure', price: 90.00, status: 'active', BranchId: b1.id, categoryId: maniCat.id, gender: 'female' });
+  await Service.create({ name: 'Classic Pedicure', type: 'pedicure', price: 110.00, status: 'active', BranchId: b1.id, categoryId: pediCat.id, gender: 'female' });
+  await Service.create({ name: 'Facial', type: 'facial', price: 150.00, status: 'active', BranchId: b1.id, categoryId: facialCat.id, gender: 'both' });
 
   // Employee specialties (super-category coverage cascades to its sub-categories at match time)
-  await emp1.setSpecialties([hair.id]);          // Barber One → all Hair services
+  await emp1.setSpecialties([hairMale.id]);                            // Barber One → all men's hair services
   await emp2.setSpecialties([hairColor.id, facialCat.id, maniCat.id]); // Hana → coloring, facial, manicure
 
   await Customer.create({ name: 'John Doe', phone: '0912345678', BranchId: b2.id, checkInTime: new Date() });
