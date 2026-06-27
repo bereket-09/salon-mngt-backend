@@ -15,7 +15,7 @@ export async function createService(req, res) {
   const {
     name, type, price, status = 'active', branchId = null,
     gender = 'both', estimatedDuration = 30, categoryId = null,
-    commissionEnabled = false, commissionRate = null
+    commissionEnabled = false, commissionRate = null, hideOnLanding = false,
   } = req.body;
   try {
     const svc = await Service.create({
@@ -29,6 +29,7 @@ export async function createService(req, res) {
       estimatedDuration,
       commissionEnabled,
       commissionRate: commissionEnabled ? clampPercent(commissionRate) : null,
+      hideOnLanding: !!hideOnLanding,
     });
     const created = await Service.findByPk(svc.id, {
       include: [Branch, { model: ServiceCategory, as: 'Category', include: [{ model: ServiceCategory, as: 'Parent' }] }],
@@ -43,10 +44,15 @@ export async function createService(req, res) {
 // List all services
 export async function listServices(req, res) {
   try {
-    const { gender, branchId, status, search, categoryId } = req.query;
+    const { gender, branchId, status, search, categoryId, landing } = req.query;
     const andClauses = [];
     if (gender) andClauses.push({ gender });
     if (status) andClauses.push({ status });
+    // Public landing page: only active + not explicitly hidden services.
+    if (landing === '1' || landing === 'true') {
+      andClauses.push({ status: 'active' });
+      andClauses.push({ hideOnLanding: { [Op.ne]: true } });
+    }
     if (categoryId && categoryId !== 'all') andClauses.push({ categoryId });
     if (branchId && branchId !== 'all') {
       // Branch-scoped: include services tied to that branch AND services with no branch (=available everywhere)
@@ -78,12 +84,13 @@ export async function updateService(req, res) {
   const { id } = req.params;
   const {
     name, type, price, status, branchId, categoryId,
-    gender, estimatedDuration, commissionEnabled, commissionRate
+    gender, estimatedDuration, commissionEnabled, commissionRate, hideOnLanding,
   } = req.body;
 
   try {
     const service = await Service.findByPk(id);
     if (!service) return res.status(404).json({ error: 'Service not found' });
+    if (hideOnLanding !== undefined) service.hideOnLanding = !!hideOnLanding;
 
     if (name !== undefined) service.name = name;
     if (type !== undefined) service.type = type;

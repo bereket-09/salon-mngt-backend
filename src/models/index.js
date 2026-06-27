@@ -69,6 +69,7 @@ export const Service = sequelize.define('Service', {
   commissionEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
   commissionRate: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
   status: { type: DataTypes.STRING, defaultValue: 'active' },
+  hideOnLanding: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
   code: { type: DataTypes.STRING, unique: true },
 }, {
   tableName: 'services',
