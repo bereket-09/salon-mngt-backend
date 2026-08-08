@@ -1,0 +1,19 @@
+# Dependencies (restore with `npm install`)
+node_modules/
+
+# Environment / secrets — keep only the value-less template
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# OS / editor cruft
+.DS_Store
+.vscode/
